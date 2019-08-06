@@ -4,3 +4,4 @@
 ^doc$
 ^Meta$
 ^working$
+^\.travis\.yml$

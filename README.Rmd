@@ -67,6 +67,7 @@ image_read("man/figures/logo.png")
 <!-- badges: start -->
 ![](http://img.shields.io/badge/cool-useless-green.svg)
 ![](http://img.shields.io/badge/dependencies-zero-blue.svg)
+[![Travis build status](https://travis-ci.org/coolbutuseless/lofi.svg?branch=master)](https://travis-ci.org/coolbutuseless/lofi)
 <!-- badges: end -->
 
 The goal of `lofi` is to squeeze multiple, low-fidelity representations of colours 
