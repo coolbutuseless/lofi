@@ -18,5 +18,6 @@ Suggests:
     exhibitionist,
     ggplot2,
     lobstr,
-    viridisLite
+    viridisLite,
+    covr
 VignetteBuilder: knitr

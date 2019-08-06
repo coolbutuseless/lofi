@@ -5,3 +5,4 @@
 ^Meta$
 ^working$
 ^\.travis\.yml$
+^codecov\.yml$
