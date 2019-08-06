@@ -1,0 +1,243 @@
+---
+title: "packing-specification"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{packing-specification}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(lofi)
+```
+
+
+Pack/Unpack values as low-fidelity representation into a single 32-bit integer.
+These functions require a packing spec (\code{pack_spec}) which defines how values
+are converted to/from their low-fidelity representations.
+
+##  Packing Specification Overview:
+
+The packing specification (`pack_spec`) is a named list detailing how
+values should be converted to their low-fidelity representations.
+
+The name of the values in the `pack_spec` correspond to the names in
+the `values` argument to `pack()`.
+
+The following are valid \code{types} for packing:
+
+* integer - A standard integer value
+* double - A standard double precision floating point value
+* logical - A standard R logical values
+* choice - Analogous to storing a factor
+* scaled - Storing a scaled value in the available bits and then
+            re-scaling when unpacking
+* colour - A standard hex colour value of the form '#123456'
+* custom - User must specify functions to convert value to
+            low-fidelity representation and reconstruction
+ 
+
+
+##  Packing Specification - Integer
+
+Integers are packed by truncating leading bits that aren't needed e.g. the number 8
+only needs 4 bis to represent it, and the other leading 28 bits can be ignored.
+
+Packing an integer in this way is lossless - the reconstructed value using
+`unpack() will be identical to the original value.
+
+* `nbits` - total number of bits to use
+* `signed` - keep a sign bit? Default: FALSE
+* `mult` - pre-scale the value when packing, and undo scaling
+when unpacking. i.e. `(value + offset) * mult. Default: 1
+* `offset` - offset the value when packing, and undo offset when
+unpacking . i.e. `(value + offset) * mult. Default: 0
+
+
+
+
+##  Packing Specification - Double
+
+Doubles are packed by truncating the mantissa and re-encoding the exponent.
+This will almost definitely lead to loss of precision, and any reconstructed
+value will not be identical to the original.
+
+* `float_name` - name of floating point representation to use. Options:
+    * 'single' - single precision 32-bits
+    * 'fp24' - 24bit float
+    * 'bfloat16' - 16 bit float
+    * 'half' - half precision 16-bits
+* `nbits` - total number of bits to use. If specified, this takes
+   precedence over the `float_name value.
+* `maxval` - only used if `nbits is specified. Used to
+  calculate the total bits in the exponent.
+* `signed` - keep a sign bit? Only used if `nbits is
+specified. Default: FALSE
+* `float_bits` - [advanced] A 3-element numeric vector giving the
+  number of bits to assign to the sign, exponent and mantissa,
+  respecively.  If given, `float_bits`  takes precedence over
+  both `nbits` and `float_name`.
+
+
+
+##  Packing Specification - Logical
+
+Logical values only require a single bit, but more bits can be specified
+if desired.
+
+* `nbits` - total number of bits to use. Optional. Default: 1
+
+
+
+##  Packing Specification - Choice
+
+A choice is very similar to a factor, but the labels are only stored in the
+specification, and the index is 0-based (instead of 1-based)
+
+* `options` - vector of options to match values against.  Only
+  the index of the value into this list is stored.
+* `nbits` - total number of bits to use. Optional. If not given,
+  it is calculated to be the number of bits necessary to store all
+  possible options.
+ 
+
+
+##  Packing Specification - Scaled
+
+Specifying the stored of a scaled value is sometimes easier than trying to
+work out how to corectly store a double precision floating point.
+
+* `nbits` - number of bits to use
+* `min` - minimum value to be stored. Default: 0
+* `max` - maximum value to be stored in the given bits. Every
+stored value is scaled by `(2^nbits - 1)/max
+when `pack()ed`, and unscaled when `unpacked()`.
+
+
+##  Packing Specification - Colour
+
+Packing a colour is achieved by truncating the bits for each of the R, G
+and B channels separately.
+
+* `nbits` - number of bits to use
+* `rgb_bits` - [advanced] A 3-element numeric vector giving the
+number of bits to assign to the R, G and B channels
+respecively.  If given, `rgb_bits` takes precedence over
+`nbits`.
+ 
+
+
+##  Packing Specification - Custom
+
+This packing specification allows you to specify a function to convert a
+value into a low-fidelity representation, and a matching function to
+reconstruct the original value.
+
+* `nbits` - number of bits to use
+* `pack_func` - a function. Alternatively, can specify a formula
+  which will be converted internally to a function taking a single
+  argument,  `.x`.
+* `unpack_func` - a function. Alternatively, can specify a formula
+  which will be converted internally to a function taking a single
+  argument,  `.x`.
+
+
+
+# Example 1
+
+```{r}
+ # Specify how to convert values to low-fidelity representation
+ pack_spec <- list(
+   x      = list(type = 'double', float_name = 'bfloat16'),
+   valid  = list(type = 'logical'),
+   stars  = list(type = 'integer', mult = 10, nbits = 6),
+   alpha  = list(type = 'scaled', max = 1, nbits = 5),
+   grade  = list(type = 'choice', options = c('A', 'B', 'C', 'D'))
+ )
+
+ # Assemble the values
+ values <- list(
+   x      = 1.234e21,
+   valid  = TRUE,
+   stars  = 4.5,     # Star rating 0-5. 1 decimal place.
+   alpha  = 0.8,     # alpha. range [0, 1]
+   grade  = 'B'
+ )
+
+ # pack them into a single integer
+ packed_values <- pack(values, pack_spec)
+
+ # Reconstruct the initial values from the packed values
+ unpack(packed_values, pack_spec)
+```
+
+
+
+
+# Example 2 - Custom packing
+
+In the following example, the same distance value is encoded in two different ways.
+
+The first method simply encodes the value as a 16 bit floating point value known as a 
+[bfloat16](https://en.wikipedia.org/wiki/Bfloat16_floating-point_format).
+
+In the second method the `pack_func` is used to take the log of the value, 
+multiply it by 100 and then store this as a 16bit integer.  The `unpack_func`
+defines the reverse.
+
+
+```{r}
+pack_spec <- list(
+  distance1 = list(type = 'double', float_name = 'bfloat16'),
+  distance2 = list(type = 'custom', nbits = 16,
+                   pack_func   = ~100 * log(.x), unpack_func = ~exp(.x/100))
+)
+
+values <- list(
+  distance1 = 1.234e21,
+  distance2 = 1.234e21
+)
+
+packed_values <- pack(values, pack_spec)
+
+unpack(packed_values, pack_spec)
+```
+
+
+
+
+# Example 3 - Custom packing of a quantized angle
+
+In the following example, an angle in the range [0, 180] is stored in just 
+2 bits by quantizing it to the nearest 45 degrees.
+
+
+```{r}
+pack_spec <- list(
+  angle = list(
+    type        = 'custom',
+    nbits       =  2,
+    pack_func   = ~round((.x %% (3.5/4*180)) / 45),
+    unpack_func = ~.x * 45
+  )
+)
+
+values <- list(
+  angle = 60
+)
+
+packed_values <- pack(values, pack_spec)
+
+unpack(packed_values, pack_spec)
+```
+
+
+
+

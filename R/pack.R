@@ -1,0 +1,476 @@
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pack_custom <- function(value, spec) {
+  if (is.null(value) || is.na(value)) {
+    stop("pack_custom(): 'value' cannot be packed: ", deparse(value), call. = FALSE)
+  }
+
+  if (!is.function(spec$pack_func)) {
+    stop("pack_custom(): Invalid 'spec$pack_func'. Expecting a function. ",
+         "Current value: ", deparse(spec$pack_func), call. = FALSE)
+  }
+
+  value <- as.integer(spec$pack_func(value))
+  int32_to_lofi(value, nbits = spec$nbits, signed = spec$signed)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+unpack_custom <- function(value, spec) {
+  value <- lofi_to_int32(value, nbits = spec$nbits, signed = spec$signed)
+
+  if (!is.function(spec$unpack_func)) {
+    stop("unpack_custom(): Invalid 'spec$unpack_func'. Expecting a function. ",
+         "Current value: ", deparse(spec$unpack_func), call. = FALSE)
+  }
+
+  spec$unpack_func(value)
+}
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' Pack/unpack values of the given type
+#'
+#' @param value value to pack
+#' @param spec specification for encoding this value
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pack_integer <- function(value, spec) {
+  if (is.null(value) || is.na(value)) {
+    stop("pack_integer(): 'value' cannot be packed as integer: ", deparse(value), call. = FALSE)
+  }
+
+  value <- as.integer(round((value + spec$offset) * spec$mult))
+  int32_to_lofi(value, nbits = spec$nbits, signed = spec$signed)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+unpack_integer <- function(value, spec) {
+  value <- lofi_to_int32(value, nbits = spec$nbits, signed = spec$signed)
+  value / spec$mult - spec$offset
+}
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pack_scaled <- function(value, spec) {
+  if (is.null(value) || is.na(value)) {
+    stop("pack_scaled(): 'value' cannot be packed as scaled: ", deparse(value), call. = FALSE)
+  }
+
+  if (isTRUE(spec$cyclical)) {
+    value <- value %% spec$max
+  }
+
+  if (value < spec$min || value > spec$max) {
+    stop("pack_scaled(): Invalid 'value'. Expecing value in range [", spec$min,
+         ", ", spec$max, "] ",
+         "Current value: ", deparse(value), call. = FALSE)
+  }
+
+  value <- (value - spec$min) / (spec$max - spec$min)
+  value <- value * (2^spec$nbits - 1)
+  value <- as.integer(round(value))
+
+  int32_to_lofi(value, nbits = spec$nbits, signed = FALSE)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+unpack_scaled <- function(value, spec) {
+  value <- lofi_to_int32(value, nbits = spec$nbits, signed = FALSE)
+  value <- value / (2^spec$nbits - 1)
+  value <- value * (spec$max - spec$min) + spec$min
+
+  value
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pack_logical <- function(value, spec) {
+  if (is.null(value) || is.na(value)) {
+    stop("pack_logical(): 'value' cannot be packed as logical: ", deparse(value), call. = FALSE)
+  }
+
+  lgl_to_lofi(value)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+unpack_logical <- function(value, spec) {
+  lofi_to_lgl(value)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pack_choice <- function(value, spec) {
+  choice_to_lofi(choice = value, options = spec$options)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+unpack_choice <- function(value, spec) {
+  lofi_to_choice(lofi = value, options = spec$options)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pack_double <- function(value, spec) {
+
+  if (is.null(value) || is.na(value)) {
+    stop("pack_double(): 'value' cannot be packed as double.", deparse(value), call. = FALSE)
+  }
+
+  dbl_to_lofi(dbl = value, float_bits = spec$float_bits)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+unpack_double <- function(value, spec) {
+  lofi_to_dbl(value, float_bits = spec$float_bits)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pack_colour <- function(value, spec) {
+
+  if (is.null(value) || is.na(value)) {
+    stop("pack_colour(): 'value' cannot be packed as colour", deparse(value), call. = FALSE)
+  }
+
+  hex_colour_to_lofi(cols = value, rgb_bits = spec$rgb_bits)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack_integer
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+unpack_colour <- function(value, spec) {
+  lofi_to_hex_colour(value, rgb_bits = spec$rgb_bits)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' Pack/Unpack values as low-fidelity representation into a single 32-bit integer
+#'
+#' Pack/Unpack values as low-fidelity representation into a single 32-bit integer.
+#' These functions require a packing spec (\code{pack_spec}) which defines how values
+#' are converted to/from their low-fidelity representations.
+#'
+#' @section Packing Specification Overview:
+#'
+#' The packing specification (\code{pack_spec}) is a named list detailing how
+#' values should be converted to their low-fidelity representations.
+#'
+#' The name of the values in the \code{pack_spec} correspond to the names in
+#' the \code{values} argument to \code{pack()}.
+#'
+#' The following are valid \code{types} for packing:
+#'
+#' \itemize{
+#'   \item{integer} - {A standard integer value}
+#'   \item{double} - {A standard double precision floating point value}
+#'   \item{logical} - {A standard R logical values}
+#'   \item{choice} - {Analogous to storing a factor}
+#'   \item{scaled} - {Storing a scaled value in the available bits and then
+#'                   re-scaling when unpacking}
+#'   \item{colour} - {A standard hex colour value of the form '#123456'}
+#'   \item{custom} - {User must specify functions to convert value to
+#'                   low-fidelity representation and reconstruction}
+#' }
+#'
+#'
+#' @section Packing Specification - Integer:
+#'
+#' Integers are packed by truncating leading bits that aren't needed e.g. the number 8
+#' only needs 4 bis to represent it, and the other leading 28 bits can be ignored.
+#'
+#' Packing an integer in this way is lossless - the reconstructed value using
+#' \code{unpack()} will be identical to the original value.
+#'
+#' \emph{specification}
+#' \itemize{
+#'   \item{\strong{\code{nbits}}} - total number of bits to use
+#'   \item{\strong{\code{signed}}} - keep a sign bit? Default: FALSE
+#'   \item{\strong{\code{mult}}} - pre-scale the value when packing, and undo scaling
+#'        when unpacking. i.e. \code{(value + offset) * mult}. Default: 1
+#'   \item{\strong{\code{offset}}} - offset the value when packing, and undo offset when
+#'        unpacking . i.e. \code{(value + offset) * mult}. Default: 0
+#' }
+#'
+#'
+#'
+#' @section Packing Specification - Double:
+#'
+#' Doubles are packed by truncating the mantissa and re-encoding the exponent.
+#' This will almost definitely lead to loss of precision, and any reconstructed
+#' value will not be identical to the original.
+#'
+#' \itemize{
+#'   \item{\strong{\code{float_name}}} - name of floating point representation to use. Options:
+#'      \itemize{
+#'        \item{'single'} - single precision 32-bits
+#'        \item{'fp24'} - 24bit float
+#'        \item{'bfloat16'} - 16 bit float
+#'        \item{'half'} - half precision 16-bits
+#'      }
+#'   \item{\strong{\code{nbits}}} - total number of bits to use. If specified, this takes
+#'        precedence over the \code{float_name} value.
+#'   \item{\strong{\code{maxval}}} - only used if \code{nbits} is specified. Used to
+#'        calculate the total bits in the exponent.
+#'   \item{\strong{\code{signed}}} - keep a sign bit? Only used if \code{nbits} is
+#'        specified. Default: FALSE
+#'   \item{\strong{\code{float_bits}}} - [advanced] A 3-element numeric vector giving the
+#'         number of bits to assign to the sign, exponent and mantissa,
+#'         respecively.  If given, \code{float_bits}  takes precedence over
+#'         both \code{nbits} and \code{float_name}.
+#' }
+#'
+#'
+#' @section Packing Specification - Logical:
+#'
+#' Logical values only require a single bit, but more bits can be specified
+#' if desired.
+#'
+#' \itemize{
+#'   \item{\strong{\code{nbits}}} - total number of bits to use. Optional. Default: 1
+#' }
+#'
+#'
+#' @section Packing Specification - Choice:
+#'
+#' A choice is very similar to a factor, but the labels are only stored in the
+#' specification, and the index is 0-based (instead of 1-based)
+#'
+#' \itemize{
+#'   \item{\strong{\code{options}}} - vector of options to match values against.  Only
+#'        the index of the value into this list is stored.
+#'   \item{\strong{\code{nbits}}} - total number of bits to use. Optional. If not given,
+#'        it is calculated to be the number of bits necessary to store all
+#'        possible options.
+#' }
+#'
+#'
+#' @section Packing Specification - Scaled:
+#'
+#' Specifying the stored of a scaled value is sometimes easier than trying to
+#' work out how to corectly store a double precision floating point.
+#'
+#' \itemize{
+#'   \item{\strong{\code{nbits}}} - number of bits to use
+#'   \item{\strong{\code{min}}} - minimum value to be stored. Default: 0
+#'   \item{\strong{\code{max}}} - maximum value to be stored in the given bits. Every
+#'        stored value is scaled by \code{(2^nbits - 1)/max}
+#'        when \code{pack()ed}, and unscaled when \code{unpacked()}.
+#' }
+#'
+#' @section Packing Specification - Colour:
+#'
+#' Packing a colour is achieved by truncating the bits for each of the R, G
+#' and B channels separately.
+#'
+#' \itemize{
+#'   \item{\strong{\code{nbits}}} - number of bits to use
+#'   \item{\strong{\code{rgb_bits}}} - [advanced] A 3-element numeric vector giving the
+#'         number of bits to assign to the R, G and B channels
+#'         respecively.  If given, \code{rgb_bits} takes precedence over
+#'         \code{nbits}.
+#' }
+#'
+#'
+#' @section Packing Specification - Custom:
+#'
+#' This packing specification allows you to specify a function to convert a
+#' value into a low-fidelity representation, and a matching function to
+#' reconstruct the original value.
+#'
+#' See \code{vignette('packing-specification', package = 'lofi')} for more examples
+#' on using a custom packing specification.
+#'
+#' \itemize{
+#'   \item{\strong{\code{nbits}}} - number of bits to use
+#'   \item{\strong{\code{pack_func}}} - a function. Alternatively, can specify a formula
+#'        which will be converted internally to a function taking a single
+#'        argument,  \code{.x}.
+#'   \item{\strong{\code{unpack_func}}} - a function. Alternatively, can specify a formula
+#'        which will be converted internally to a function taking a single
+#'        argument,  \code{.x}.
+#' }
+#'
+#'
+#'
+#' @param values named vector or list of values
+#' @param int32 standard R integer with the packed bits
+#' @param pack_spec list describing the low-fidelity representation of each value
+#'
+#' @return \code{pack()} takes a named list of values and returns an integer. \code{unpack()}
+#' takes an integer and returns a named list of values.
+#'
+#' @export
+#'
+#' @examples
+#' # Specify how to convert values to low-fidelity representation
+#' pack_spec <- list(
+#'   x      = list(type = 'double', float_name = 'bfloat16'),
+#'   valid  = list(type = 'logical'),
+#'   stars  = list(type = 'integer', mult = 10, nbits = 6),
+#'   alpha  = list(type = 'scaled', max = 1, nbits = 5),
+#'   grade  = list(type = 'choice', options = c('A', 'B', 'C', 'D'))
+#' )
+#'
+#' # Assemble the values
+#' values <- list(
+#'   x      = 1.234e21,
+#'   valid  = TRUE,
+#'   stars  = 4.5,     # Star rating 0-5. 1 decimal place.
+#'   alpha  = 0.8,     # alpha. range [0, 1]
+#'   grade  = 'B'
+#' )
+#'
+#' # pack them into a single integer
+#' packed_values <- pack(values, pack_spec)
+#'
+#' # Reconstruct the initial values from the packed values
+#' unpack(packed_values, pack_spec)
+#'
+#' #> $x
+#' #> [1] 1.226708e+21
+#' #>
+#' #> $valid
+#' #> [1] TRUE
+#' #>
+#' #> $stars
+#' #> [1] 4.5
+#' #>
+#' #> $alpha
+#' #> [1] 0.8064516
+#' #>
+#' #> $grade
+#' #> [1] "B"
+#'
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pack <- function(values, pack_spec) {
+
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  # Check that all names mentioned in the 'pack_spec' actually exist in the data
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  missing_names <- setdiff(names(pack_spec), names(values))
+  if (length(missing_names) > 0L) {
+    stop("pack(): 'pack_spec' includes names which aren't available in the 'values' data: ",
+         deparse(missing_names), call. = FALSE)
+  }
+
+  pack_spec <- sanitise_pack_spec(pack_spec)
+
+  int32 <- 0L
+
+  for (ii in seq_along(pack_spec)) {
+    spec     <- pack_spec[[ii]]
+    val_name <- names(pack_spec)[ii]
+    val0     <- values[[val_name]]
+    bits     <- spec$nbits
+
+    if (length(val0) > 1L) {
+      stop("pack(): Invalid value to pack. Expecting value of length 1. ",
+           "Current value: ", deparse(value), call. = FALSE)
+    }
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Encode 'val0' into its packed representation
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    value <- switch (
+      spec$type,
+      integer = pack_integer(val0, spec),
+      logical = pack_logical(val0, spec),
+      double  = pack_double (val0, spec),
+      choice  = pack_choice (val0, spec),
+      colour  = pack_colour (val0, spec),
+      custom  = pack_custom (val0, spec),
+      scaled  = pack_scaled (val0, spec),
+      stop("pack(): Invalid spec$type: ", spec$type, call. = FALSE)
+    )
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Final sanity check that 'value' fits into the alloted space and
+    # isn't NA, NULL, etc.
+    # In theory, this should never happen if all the individual pack() functions
+    # work properly.
+    # nocov start
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    if (!valid_encoded_value(value, bits)) {
+      stop("pack(): Invalid ", spec$nbits,
+           "-bit ", spec$type, " value for ", val_name, ".  Original: [",
+           val0, "].  Encoded: [", value, "]", call. = FALSE)
+    }
+    # nocov end
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Pack the new bits in
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    int32 <- bitwShiftL(int32, bits)
+    int32 <- int32 + value
+  }
+
+  int32
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname pack
+#' @export
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+unpack <- function(int32, pack_spec) {
+  pack_spec <- sanitise_pack_spec(pack_spec)
+
+  res <- list()
+
+  for (ii in rev(seq_along(pack_spec))) {
+    spec  <- pack_spec[[ii]]
+    value <- bitwAnd(int32, mask(spec$nbits))
+
+    value <- switch(
+      spec$type,
+      integer = unpack_integer(value, spec),
+      logical = unpack_logical(value, spec),
+      double  = unpack_double (value, spec),
+      choice  = unpack_choice (value, spec),
+      colour  = unpack_colour (value, spec),
+      custom  = unpack_custom (value, spec),
+      scaled  = unpack_scaled (value, spec),
+      stop("unpack(): Invalid spec$type: ", spec$type, call. = FALSE)
+    )
+
+    res[[ii]] <- value
+    int32     <- bitwShiftR(int32, spec$nbits)
+  }
+
+  names(res) <- names(pack_spec)
+  res
+}
+

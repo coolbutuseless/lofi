@@ -1,0 +1,132 @@
+---
+title: "lofi-colour"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{lofi-colour}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(purrr)
+  library(lofi)
+})
+```
+
+```{r setup}
+library(lofi)
+```
+
+
+# Introduction
+
+Colours in R are usually stored as 8-bits per channel for red, green and blue - 
+with a total of 24-bits then required for a single RGB colour.  This means that 
+there are a total of `2^24 = 16777216` possible colour values.
+
+Each 8-bit value is usually represented as hex e.g. `255 = FF`, and then all 
+the values are concatenated to specify a colour e.g.`red = #FF0000`.
+
+Note: `lofi` has no built-in support for colours with alpha values.
+
+# Storing a colour in 8-bits
+
+To store a colour in 8-bits, `lofi` truncates the lower bits from each of the 
+colour channels, keepingly 3 bits for red and green channels, and only 2 bits
+for blue.  More information about the 8-bit colour format is [available on wikipedia](https://en.wikipedia.org/wiki/8-bit_color).
+
+
+8-bit colour means that only 256 colours can be represented, so conversion to 
+this low-fidelity representation and back again will results in the loss of
+colour accuracy.  
+
+
+# Rainbow palette in 8-bits
+
+In the following example, 8 colours from a rainbow palette are converted to 
+8-bit colour and then reconstructed.  Visually, the reconstructed palette looks 
+very close to the original colours.
+
+```{r, fig.height = 3}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Create a rainbow palette
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(pal <- rainbow(8))
+lofi::plot_palette(pal)
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Convert to 8-bit lofi representation and back again
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lofi_pal <- lofi::hex_colour_to_lofi(pal, rgb_bits = c(3, 3, 2))
+reconstructed <- lofi::lofi_to_hex_colour(lofi_pal, c(3, 3, 2))
+lofi::plot_palette(reconstructed)
+```
+
+
+
+
+
+# Viridis palette in 8-bits
+
+In the following example, 64 colours from a viridis palette are converted to 
+8-bit colour and then reconstructed.  Visually, the reconstructed palette looks 
+similar to the original colours, but the errors in colour accuracy are quite apparent.
+
+```{r, fig.height = 3}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Create a viridis palette
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pal <- viridisLite::plasma(64)
+lofi::plot_palette(pal, width = 100, height = 100, ncol = 8, xf = 0.95)
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Convert to 8-bit lofi representation and back again
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lofi_pal <- lofi::hex_colour_to_lofi(pal, rgb_bits = c(3, 3, 2))
+reconstructed <- lofi::lofi_to_hex_colour(lofi_pal, c(3, 3, 2))
+lofi::plot_palette(reconstructed, width = 100, height = 100, ncol = 8, xf = 0.95)
+```
+
+
+
+
+# Viridis palette in 12-bits
+
+In the following example, 64 colours from a viridis palette are converted to 
+12-bit colour and then reconstructed.  Visually, the reconstructed palette looks 
+similar to the original colours, and the errors in colour accuracy are less apparent
+than with only 8-bits
+
+```{r, fig.height = 3}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Convert to 12-bit lofi representation and back again
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+lofi_pal <- lofi::hex_colour_to_lofi(pal, rgb_bits = c(4, 4, 4))
+reconstructed <- lofi::lofi_to_hex_colour(lofi_pal, c(4, 4, 4))
+lofi::plot_palette(reconstructed, width = 100, height = 100, ncol = 8, xf = 0.95)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
