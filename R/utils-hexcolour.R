@@ -51,4 +51,82 @@ plot_lofi_palette <- function(lofi, rgb_bits, title = NULL) {
   plot_palette(hex_colours, title)
 }
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' Convert between equivalent 32-bit representations
+#'
+#' @param rgba_vec  4-element RGBA colour with values in range [0, 255]
+#' @param hex_colour string "#0a44f5', "#33ff12ff"
+#' @param int32 32 bit integer
+#'
+#' @return Hex colour with Alpha
+#'
+#'
+#' @importFrom grDevices col2rgb rgb
+#' @export
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+rgba_vec_to_hex_colour <- function(rgba_vec) {
+  args <- as.list(rgba_vec)
+  args$maxColorValue <- 255
+
+  do.call(grDevices::rgb, args)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname rgba_vec_to_hex_colour
+#' @export
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+hex_colour_to_rgba_vec <- function(hex_colour) {
+  stopifnot(length(hex_colour) == 1L)
+  as.vector(grDevices::col2rgb(hex_colour, alpha = TRUE))
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname rgba_vec_to_hex_colour
+#' @export
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+int32_to_hex_colour <- function(int32) {
+  rgba <- int32_to_rgba_vec(int32)
+  grDevices::rgb(rgba[1], rgba[2], rgba[3], rgba[4], maxColorValue = 255L)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname rgba_vec_to_hex_colour
+#' @export
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+hex_colour_to_int32 <- function(hex_colour) {
+  mat <- grDevices::col2rgb(hex_colour, alpha = TRUE)
+
+  apply(mat, 2, rgba_vec_to_int32)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname rgba_vec_to_hex_colour
+#' @export
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+rgba_vec_to_int32 <- function(rgba_vec) {
+  if (length(rgba_vec) != 4L) {
+    stop("rgba_vec_to_int32(): rgba_vec must have 4 elements, not: ", deparse(rgba_vec))
+  }
+
+  readBin(rev(as.raw(rgba_vec)), what = 'integer', n = 1)
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#' @rdname rgba_vec_to_hex_colour
+#' @export
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+int32_to_rgba_vec <- function(int32) {
+  stopifnot(is.integer(int32))
+  as.integer(writeBin(int32, raw(), size = 4L, useBytes = TRUE, endian = 'big'))
+}
+
 # nocov end
+
+
+

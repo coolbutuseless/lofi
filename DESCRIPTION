@@ -1,7 +1,7 @@
 Package: lofi
 Type: Package
 Title: Pack and Unpack Bits into Low Fidelity Representations
-Version: 0.1.0
+Version: 0.1.1
 Author: mikefc
 Maintainer: mikefc <mikefc@coolbutuseless.com>
 Description: Pack and unpack bits to/from low fidelity representations.

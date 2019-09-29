@@ -6,3 +6,4 @@
 ^working$
 ^\.travis\.yml$
 ^codecov\.yml$
+^pkgdown$
